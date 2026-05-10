@@ -1,0 +1,127 @@
+// check gpu
+// !nvidia-smi
+
+%%writefile vector_add.cu
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <cuda_runtime.h>
+#include <stdbool.h>
+
+__global__ void vectorAdd(int* a, int* b, int* c, int size)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (tid < size) {
+        c[tid] = a[tid] + b[tid];
+    }
+}
+
+void vectorAddNormal(int* a, int* b, int* c, int size)
+{
+    for (int i = 0; i < size; i++) {
+        c[i] = a[i] + b[i];
+    }
+}
+
+bool verifyResults(int* c_cuda, int* c_normal, int size)
+{
+    for (int i = 0; i < size; i++) {
+        if (c_cuda[i] != c_normal[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+int main()
+{
+    int size = 1000000;
+
+    int *a, *b, *c_cuda, *c_normal;
+    int *dev_a, *dev_b, *dev_c;
+
+    a = (int*)malloc(size*sizeof(int));
+    b = (int*)malloc(size*sizeof(int));
+    c_cuda = (int*)malloc(size*sizeof(int));
+    c_normal = (int*)malloc(size*sizeof(int));
+
+    for(int i=0;i<size;i++) {
+        a[i] = rand()%1000;
+        b[i] = rand()%1000;
+    }
+
+    cudaMalloc((void**)&dev_a, size*sizeof(int));
+    cudaMalloc((void**)&dev_b, size*sizeof(int));
+    cudaMalloc((void**)&dev_c, size*sizeof(int));
+
+    cudaMemcpy(dev_a, a, size*sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_b, b, size*sizeof(int), cudaMemcpyHostToDevice);
+
+    clock_t start_cuda, end_cuda;
+
+    start_cuda = clock();
+
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+
+    vectorAdd<<<gridSize, blockSize>>>(dev_a, dev_b, dev_c, size);
+
+    cudaDeviceSynchronize();
+
+    end_cuda = clock();
+
+    double cuda_time =
+        (double)(end_cuda - start_cuda) / CLOCKS_PER_SEC;
+
+    cudaMemcpy(
+        c_cuda,
+        dev_c,
+        size*sizeof(int),
+        cudaMemcpyDeviceToHost
+    );
+
+    clock_t start_cpu, end_cpu;
+
+    start_cpu = clock();
+
+    vectorAddNormal(a, b, c_normal, size);
+
+    end_cpu = clock();
+
+    double cpu_time =
+        (double)(end_cpu - start_cpu) / CLOCKS_PER_SEC;
+
+    bool result =
+        verifyResults(c_cuda, c_normal, size);
+
+    printf("GPU Time: %f\n", cuda_time);
+
+    printf("CPU Time: %f\n", cpu_time);
+
+    if(result)
+        printf("Output Match: True\n");
+    else
+        printf("Output Match: False\n");
+
+    printf("Speedup: %f\n", cpu_time/cuda_time);
+
+    cudaFree(dev_a);
+    cudaFree(dev_b);
+    cudaFree(dev_c);
+
+    free(a);
+    free(b);
+    free(c_cuda);
+    free(c_normal);
+
+    return 0;
+}
+
+// compile
+// !nvcc vector_add.cu -o vector_add
+
+// run
+// !./vector_add

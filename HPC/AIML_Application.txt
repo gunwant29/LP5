@@ -1,0 +1,114 @@
+#include <iostream>
+#include <vector>
+#include <cstdlib>
+#include <omp.h>
+#include <chrono>
+
+using namespace std;
+using namespace chrono;
+
+int main()
+{
+    int n = 100000;
+
+    vector<float> x(n), y(n);
+
+    // Generate Data : y = 5x + noise
+    for(int i = 0; i < n; i++)
+    {
+        x[i] = rand() % 100;
+
+        y[i] = 5 * x[i] + (rand() % 10);
+    }
+
+    // Sequential Linear Regression
+    float sumX = 0;
+    float sumY = 0;
+    float sumXY = 0;
+    float sumXX = 0;
+
+    auto start = high_resolution_clock::now();
+
+    for(int i = 0; i < n; i++)
+    {
+        sumX += x[i];
+
+        sumY += y[i];
+
+        sumXY += x[i] * y[i];
+
+        sumXX += x[i] * x[i];
+    }
+
+    float a1 =
+    (n * sumXY - sumX * sumY) /
+    (n * sumXX - sumX * sumX);
+
+    float b1 =
+    (sumY - a1 * sumX) / n;
+
+    auto end = high_resolution_clock::now();
+
+    double seqTime =
+    duration<double, milli>(end - start).count();
+
+    // Parallel Linear Regression
+    float pSumX = 0;
+    float pSumY = 0;
+    float pSumXY = 0;
+    float pSumXX = 0;
+
+    start = high_resolution_clock::now();
+
+    #pragma omp parallel for reduction(+:pSumX,pSumY,pSumXY,pSumXX)
+    for(int i = 0; i < n; i++)
+    {
+        pSumX += x[i];
+
+        pSumY += y[i];
+
+        pSumXY += x[i] * y[i];
+
+        pSumXX += x[i] * x[i];
+    }
+
+    float a2 =
+    (n * pSumXY - pSumX * pSumY) /
+    (n * pSumXX - pSumX * pSumX);
+
+    float b2 =
+    (pSumY - a2 * pSumX) / n;
+
+    end = high_resolution_clock::now();
+
+    double parTime =
+    duration<double, milli>(end - start).count();
+
+    // Output
+    cout << "Sequential Equation:\n";
+
+    cout << "y = "
+         << a1
+         << "x + "
+         << b1 << endl;
+
+    cout << "\nSequential Time: "
+         << seqTime
+         << " ms\n";
+
+    cout << "\nParallel Equation:\n";
+
+    cout << "y = "
+         << a2
+         << "x + "
+         << b2 << endl;
+
+    cout << "\nParallel Time: "
+         << parTime
+         << " ms\n";
+
+    cout << "\nSpeedup: "
+         << seqTime / parTime << endl;
+
+    return 0;
+}

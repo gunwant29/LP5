@@ -1,0 +1,113 @@
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <stack>
+#include <omp.h>
+
+using namespace std;
+
+// Graph using adjacency list
+vector<vector<int>> graph;
+
+// Parallel BFS
+void parallelBFS(int start, int vertices)
+{
+    vector<bool> visited(vertices, false);
+
+    queue<int> q;
+
+    q.push(start);
+
+    visited[start] = true;
+
+    cout << "Parallel BFS Traversal: ";
+
+    while(!q.empty())
+    {
+        int node = q.front();
+        q.pop();
+
+        cout << node << " ";
+
+        #pragma omp parallel for
+        for(int i = 0; i < graph[node].size(); i++)
+        {
+            int adjNode = graph[node][i];
+
+            if(!visited[adjNode])
+            {
+                #pragma omp critical
+                {
+                    if(!visited[adjNode])
+                    {
+                        visited[adjNode] = true;
+                        q.push(adjNode);
+                    }
+                }
+            }
+        }
+    }
+
+    cout << endl;
+}
+
+// Parallel DFS
+void parallelDFS(int start, int vertices)
+{
+    vector<bool> visited(vertices, false);
+
+    stack<int> st;
+
+    st.push(start);
+
+    cout << "Parallel DFS Traversal: ";
+
+    while(!st.empty())
+    {
+        int node = st.top();
+        st.pop();
+
+        if(!visited[node])
+        {
+            visited[node] = true;
+
+            cout << node << " ";
+
+            #pragma omp parallel for
+            for(int i = 0; i < graph[node].size(); i++)
+            {
+                int adjNode = graph[node][i];
+
+                if(!visited[adjNode])
+                {
+                    #pragma omp critical
+                    {
+                        st.push(adjNode);
+                    }
+                }
+            }
+        }
+    }
+
+    cout << endl;
+}
+
+int main()
+{
+    int vertices = 5;
+
+    graph.resize(vertices);
+
+    // Undirected Graph
+    graph[0] = {1, 2};
+    graph[1] = {0, 3, 4};
+    graph[2] = {0};
+    graph[3] = {1};
+    graph[4] = {1};
+
+    parallelBFS(0, vertices);
+
+    parallelDFS(0, vertices);
+
+    return 0;
+}

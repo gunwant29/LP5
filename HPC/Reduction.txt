@@ -1,0 +1,105 @@
+#include <iostream>
+#include <vector>
+#include <omp.h>
+#include <chrono>
+
+using namespace std;
+using namespace chrono;
+
+int main()
+{
+    int n = 10;
+
+    vector<int> arr(n);
+
+    // Random Input
+    for(int i = 0; i < n; i++)
+    {
+        arr[i] = rand() % 100;
+        cout << arr[i] << " ";
+    }
+
+    cout << endl;
+
+    // Sequential Operations
+    int sum = 0;
+    int maxVal = arr[0];
+    int minVal = arr[0];
+
+    auto start = high_resolution_clock::now();
+
+    for(int i = 0; i < n; i++)
+    {
+        sum += arr[i];
+
+        if(arr[i] > maxVal)
+            maxVal = arr[i];
+
+        if(arr[i] < minVal)
+            minVal = arr[i];
+    }
+
+    double avg = (double)sum / n;
+
+    auto end = high_resolution_clock::now();
+
+    double seqTime =
+    duration<double, nano>(end - start).count();
+
+    cout << "\nSequential Execution\n";
+
+    cout << "Sum = " << sum << endl;
+    cout << "Average = " << avg << endl;
+    cout << "Maximum = " << maxVal << endl;
+    cout << "Minimum = " << minVal << endl;
+
+    cout << "Time = " << seqTime << " ns\n";
+
+    // Parallel Operations
+    int pSum = 0;
+    int pMax = arr[0];
+    int pMin = arr[0];
+
+    start = high_resolution_clock::now();
+
+    #pragma omp parallel for reduction(+:pSum)
+    for(int i = 0; i < n; i++)
+    {
+        pSum += arr[i];
+    }
+
+    #pragma omp parallel for reduction(max:pMax)
+    for(int i = 0; i < n; i++)
+    {
+        if(arr[i] > pMax)
+            pMax = arr[i];
+    }
+
+    #pragma omp parallel for reduction(min:pMin)
+    for(int i = 0; i < n; i++)
+    {
+        if(arr[i] < pMin)
+            pMin = arr[i];
+    }
+
+    double pAvg = (double)pSum / n;
+
+    end = high_resolution_clock::now();
+
+    double parTime =
+    duration<double, nano>(end - start).count();
+
+    cout << "\nParallel Execution\n";
+
+    cout << "Sum = " << pSum << endl;
+    cout << "Average = " << pAvg << endl;
+    cout << "Maximum = " << pMax << endl;
+    cout << "Minimum = " << pMin << endl;
+
+    cout << "Time = " << parTime << " ns\n";
+
+    cout << "\nSpeedup = "
+         << seqTime / parTime << endl;
+
+    return 0;
+}
